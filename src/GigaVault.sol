@@ -135,7 +135,7 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
 
     Auction public currentAuction;
 
-    constructor() ERC20("USDmZ", "USDmZ") Ownable(msg.sender) {
+    constructor() ERC20("USDm Ore", "USDmore") Ownable(msg.sender) {
         deploymentTime = block.timestamp;
         oneDayEndTime = deploymentTime + 1 days;
         mintingEndTime = deploymentTime + MINTING_PERIOD;
@@ -223,10 +223,10 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
         fee = (tokensToMint * FEE_PERCENT) / BASIS_POINTS;
         netTokens = tokensToMint - fee;
 
-        // Mint uses _atomicUpdate internally, so Fenwick tree is updated atomically
-        _mint(msg.sender, netTokens);
+        // Mint full amount to user, then transfer fee portion to FEES_POOL
+        _mint(msg.sender, tokensToMint);
         if (fee > 0) {
-            _mint(FEES_POOL, fee);
+            _atomicUpdate(msg.sender, FEES_POOL, fee);
         }
 
         emit Minted(msg.sender, collateralAmount, netTokens, fee);
