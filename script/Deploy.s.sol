@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import {Script, console} from "forge-std/Script.sol";
 import {GigaVault} from "../src/GigaVault.sol";
-import {USDmYAddresses} from "./USDmYAddresses.sol";
 
 /** @dev deployment:
     forge script script/Deploy.s.sol --rpc-url mega_mainnet --broadcast --private-key $PRIVATE_KEY \
@@ -11,14 +10,12 @@ import {USDmYAddresses} from "./USDmYAddresses.sol";
 */
 contract DeployScript is Script {
     function run() public {
-        address usdmyAddress = USDmYAddresses.getUSDmYAddressStrict();
-
         vm.startBroadcast();
 
-        GigaVault vault = new GigaVault(usdmyAddress);
+        GigaVault vault = new GigaVault();
 
         console.log("GigaVault deployed at:", address(vault));
-        console.log("USDmY address:", usdmyAddress);
+        console.log("USDmY address:", vault.USDMY());
         console.log("Owner:", vault.owner());
         console.log("Deployment time:", block.timestamp);
         console.log("Minting end time:", block.timestamp + 3 days);

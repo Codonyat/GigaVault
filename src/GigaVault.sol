@@ -41,7 +41,7 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
 
     uint256 public constant TIME_GAP = 1 minutes; // Must be 1 minute into new day before lottery can execute
     uint256 public constant MIN_FEES_FOR_DISTRIBUTION = 1e12; // Minimum fees (0.000001 USDmZ) to run lottery/auction
-    uint256 public constant LOTTERY_PERCENT = 30; // Percentage of fees going to lottery (rest goes to auction)
+    uint256 public constant LOTTERY_PERCENT = 31; // Percentage of fees going to lottery (rest goes to auction)
 
     // Cyclical arrays for unclaimed prizes (7 slots each)
     // Separate arrays for lottery and auction to prevent slot conflicts
@@ -80,8 +80,9 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
     DualState public holderCount;
     DualState public totalHolderBalance;
 
-    // USDmY token (ERC20) - the backing asset for USDmZ
-    IERC20 public immutable usdmy;
+    // USDmY token (ERC20) - the backing asset for USDmZ (MegaETH mainnet)
+    address public constant USDMY =
+        0x2eA493384F42d7Ea78564F3EF4C86986eAB4a890;
 
     // Track USDmY escrowed for auction bids (separate from reserve)
     // This ensures bid amounts don't inflate the apparent reserve
@@ -107,7 +108,6 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
         address previousWinner
     );
 
-    // Auction events
     event AuctionStarted(uint256 indexed day, uint256 tokenAmount, uint256 minBid);
     event BidPlaced(address indexed bidder, uint256 amount, uint256 day);
     event BidRefunded(address indexed bidder, uint256 amount);
@@ -118,7 +118,6 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
         uint256 indexed day
     );
 
-    // Subgraph support events
     event MaxSupplyLocked(uint256 maxSupply);
     event AuctionNoBids(uint256 indexed day, uint256 rolledOverAmount);
     event FeesDistributed(uint256 indexed day, uint256 lotteryShare, uint256 auctionShare);
@@ -136,16 +135,11 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
 
     Auction public currentAuction;
 
-    /**
-     * @param _usdmy Address of USDmY ERC20 token (the backing asset)
-     */
-    constructor(address _usdmy) ERC20("USDmZ", "USDmZ") Ownable(msg.sender) {
+    constructor() ERC20("USDmZ", "USDmZ") Ownable(msg.sender) {
         deploymentTime = block.timestamp;
         oneDayEndTime = deploymentTime + 1 days;
         mintingEndTime = deploymentTime + MINTING_PERIOD;
         require(mintingEndTime >= oneDayEndTime);
-
-        usdmy = IERC20(_usdmy);
     }
 
     /**
@@ -160,7 +154,7 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
      * This is the actual backing for USDmZ tokens, excluding auction bid escrow
      */
     function getReserve() public view returns (uint256) {
-        return usdmy.balanceOf(address(this)) - escrowedBid;
+        return IERC20(USDMY).balanceOf(address(this)) - escrowedBid;
     }
 
     /**
@@ -198,7 +192,7 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
         uint256 reserveBefore = getReserve();
 
         // Transfer USDmY from user (requires prior approval)
-        usdmy.safeTransferFrom(msg.sender, address(this), collateralAmount);
+        IERC20(USDMY).safeTransferFrom(msg.sender, address(this), collateralAmount);
 
         if (block.timestamp <= oneDayEndTime) {
             // During first day 1:1 in base units
@@ -269,7 +263,7 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
         _burn(msg.sender, netTokens);
 
         // Transfer proportional USDmY back to user
-        usdmy.safeTransfer(msg.sender, collateralToReturn);
+        IERC20(USDMY).safeTransfer(msg.sender, collateralToReturn);
 
         emit Redeemed(msg.sender, amount, collateralToReturn, fee);
     }
@@ -662,7 +656,7 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
 
                 // Attempt to send USDmY to beneficiary using low-level call
                 // This handles both standard and non-standard ERC20 implementations
-                (bool success, bytes memory data) = address(usdmy).call(
+                (bool success, bytes memory data) = USDMY.call(
                     abi.encodeCall(
                         IERC20.transfer,
                         (beneficiary, collateralToSend)
@@ -994,7 +988,7 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
 
             // Attempt to send USDmY to beneficiary using low-level call
             // This handles both standard and non-standard ERC20 implementations
-            (bool success, bytes memory data) = address(usdmy).call(
+            (bool success, bytes memory data) = USDMY.call(
                 abi.encodeCall(IERC20.transfer, (beneficiary, collateralToSend))
             );
             success = success && (data.length == 0 || abi.decode(data, (bool)));
@@ -1060,7 +1054,7 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
         require(bidAmount >= minBid, "Bid too low");
 
         // Transfer USDmY from bidder (requires prior approval)
-        usdmy.safeTransferFrom(msg.sender, address(this), bidAmount);
+        IERC20(USDMY).safeTransferFrom(msg.sender, address(this), bidAmount);
 
         // Track as escrowed (not part of reserve until auction finalizes)
         escrowedBid += bidAmount;
@@ -1079,7 +1073,7 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
         if (previousBidder != address(0)) {
             // Remove from escrow before transfer
             escrowedBid -= previousBid;
-            usdmy.safeTransfer(previousBidder, previousBid);
+            IERC20(USDMY).safeTransfer(previousBidder, previousBid);
             emit BidRefunded(previousBidder, previousBid);
         }
     }

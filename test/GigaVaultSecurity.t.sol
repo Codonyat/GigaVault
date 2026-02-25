@@ -53,8 +53,10 @@ contract GigaVaultSecurityTest is Test {
     address public charlie = address(0x3);
 
     function setUp() public {
-        usdmy = new MockUSDmY();
-        vault = new GigaVault(address(usdmy));
+        MockUSDmY mockImpl = new MockUSDmY();
+        vm.etch(0x2eA493384F42d7Ea78564F3EF4C86986eAB4a890, address(mockImpl).code);
+        usdmy = MockUSDmY(0x2eA493384F42d7Ea78564F3EF4C86986eAB4a890);
+        vault = new GigaVault();
 
         usdmy.mint(alice, 100 ether);
         usdmy.mint(bob, 100 ether);

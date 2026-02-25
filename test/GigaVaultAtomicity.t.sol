@@ -69,8 +69,10 @@ contract GigaVaultAtomicityTest is Test {
     );
 
     function setUp() public {
-        usdmy = new MockUSDmYLocal();
-        vault = new GigaVault(address(usdmy));
+        MockUSDmYLocal mockImpl = new MockUSDmYLocal();
+        vm.etch(0x2eA493384F42d7Ea78564F3EF4C86986eAB4a890, address(mockImpl).code);
+        usdmy = MockUSDmYLocal(0x2eA493384F42d7Ea78564F3EF4C86986eAB4a890);
+        vault = new GigaVault();
 
         // Fund accounts with USDmY tokens
         usdmy.mint(alice, 100 ether);

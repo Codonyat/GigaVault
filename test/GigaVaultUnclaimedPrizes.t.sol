@@ -65,8 +65,10 @@ contract GigaVaultUnclaimedPrizesBugTest is Test {
     event AuctionStarted(uint256 indexed day, uint256 tokenAmount, uint256 minBid);
 
     function setUp() public {
-        usdmy = new MockUSDmY();
-        vault = new GigaVault(address(usdmy));
+        MockUSDmY mockImpl = new MockUSDmY();
+        vm.etch(0x2eA493384F42d7Ea78564F3EF4C86986eAB4a890, address(mockImpl).code);
+        usdmy = MockUSDmY(0x2eA493384F42d7Ea78564F3EF4C86986eAB4a890);
+        vault = new GigaVault();
 
         // Fund test accounts
         usdmy.mint(alice, 1000 ether);

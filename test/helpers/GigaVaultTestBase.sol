@@ -43,11 +43,13 @@ abstract contract GigaVaultTestBase is Test {
     );
 
     function setUp() public virtual {
-        // Deploy mock USDmY token
-        usdmy = new MockUSDmY();
+        // Deploy mock USDmY and etch its code to the hardcoded constant address
+        MockUSDmY mockImpl = new MockUSDmY();
+        vm.etch(0x2eA493384F42d7Ea78564F3EF4C86986eAB4a890, address(mockImpl).code);
+        usdmy = MockUSDmY(0x2eA493384F42d7Ea78564F3EF4C86986eAB4a890);
 
-        // Deploy GigaVault with USDmY token address
-        vault = new GigaVault(address(usdmy));
+        // Deploy GigaVault (uses hardcoded USDmY constant)
+        vault = new GigaVault();
 
         // Fund test accounts with ETH (for gas) and USDmY tokens
         vm.deal(alice, 100 ether);

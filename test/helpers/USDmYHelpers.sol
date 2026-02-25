@@ -83,8 +83,10 @@ abstract contract USDmYTestBase is Test {
     MockUSDmY public usdmy;
 
     function setupUSDmY() internal {
-        // Deploy mock USDmY for tests that don't inherit from GigaVaultTestBase
-        usdmy = new MockUSDmY();
+        // Deploy mock USDmY and etch its code to the hardcoded constant address
+        MockUSDmY mockImpl = new MockUSDmY();
+        vm.etch(0x2eA493384F42d7Ea78564F3EF4C86986eAB4a890, address(mockImpl).code);
+        usdmy = MockUSDmY(payable(0x2eA493384F42d7Ea78564F3EF4C86986eAB4a890));
     }
 
     function getUSDmYAndApprove(
