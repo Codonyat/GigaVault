@@ -9,9 +9,9 @@ import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step
 
 /**
  * @title GigaVault
- * @dev ERC20 token (USDmZ) backed by USDmY with daily lottery and auction mechanics
- * - 1:1 ratio (USDmY 18 decimals, USDmZ 18 decimals)
- * - Redemption: Proportional share of contract's USDmY (USDmZ * USDmY balance / total supply)
+ * @dev ERC20 token (USDmore) backed by USDmY with daily lottery and auction mechanics
+ * - 1:1 ratio (USDmY 18 decimals, USDmore 18 decimals)
+ * - Redemption: Proportional share of contract's USDmY (USDmore * USDmY balance / total supply)
  * - 1% fee on mint/burn/transfer (split between lottery and auction pools)
  * - Daily lottery for random holder using prevrandao
  * - Daily auctions using ERC20 USDmY
@@ -36,11 +36,11 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
     uint256 public immutable oneDayEndTime;
 
     // Packed storage slot: 112 + 32 = 144 bits (fits in one 256-bit slot)
-    uint112 public maxSupplyEver; // Set after minting period (max ~5.2 quadrillion USDmZ with 18 decimals)
+    uint112 public maxSupplyEver; // Set after minting period (max ~5.2 quadrillion USDmore with 18 decimals)
     uint32 public lastLotteryDay; // Day counter (sufficient for ~11.7 million years)
 
     uint256 public constant TIME_GAP = 1 minutes; // Must be 1 minute into new day before lottery can execute
-    uint256 public constant MIN_FEES_FOR_DISTRIBUTION = 1e12; // Minimum fees (0.000001 USDmZ) to run lottery/auction
+    uint256 public constant MIN_FEES_FOR_DISTRIBUTION = 1e12; // Minimum fees (0.000001 USDmore) to run lottery/auction
     uint256 public constant LOTTERY_PERCENT = 31; // Percentage of fees going to lottery (rest goes to auction)
 
     // Cyclical arrays for unclaimed prizes (7 slots each)
@@ -50,7 +50,7 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
     // Packed struct: 160 + 112 = 272 bits (exceeds 256, uses 2 slots per prize)
     struct UnclaimedPrize {
         address winner; // 160 bits
-        uint112 amount; // 112 bits (USDmZ amount for prizes)
+        uint112 amount; // 112 bits (USDmore amount for prizes)
     }
 
     UnclaimedPrize[7] public lotteryUnclaimedPrizes;
@@ -80,7 +80,7 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
     DualState public holderCount;
     DualState public totalHolderBalance;
 
-    // USDmY token (ERC20) - the backing asset for USDmZ (MegaETH mainnet)
+    // USDmY token (ERC20) - the backing asset for USDmore (MegaETH mainnet)
     address public constant USDMY =
         0x2eA493384F42d7Ea78564F3EF4C86986eAB4a890;
 
@@ -129,7 +129,7 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
         address currentBidder; // 160 bits
         uint96 currentBid; // 96 bits - USDmY amount bid
         uint96 minBid; // 96 bits - Minimum bid required (in USDmY)
-        uint112 auctionTokens; // 112 bits - USDmZ amount being auctioned
+        uint112 auctionTokens; // 112 bits - USDmore amount being auctioned
         uint32 auctionDay; // 32 bits - Day of the auction
     }
 
@@ -151,7 +151,7 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
 
     /**
      * @dev Get the USDmY reserve (total USDmY balance minus escrowed bid amounts)
-     * This is the actual backing for USDmZ tokens, excluding auction bid escrow
+     * This is the actual backing for USDmore tokens, excluding auction bid escrow
      */
     function getReserve() public view returns (uint256) {
         return IERC20(USDMY).balanceOf(address(this)) - escrowedBid;
@@ -163,15 +163,15 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
     function _checkAndSetMaxSupply() internal {
         if (maxSupplyEver == 0 && block.timestamp > mintingEndTime) {
             // Set max supply based on total supply at end of minting period
-            // 1:1 conversion - max supply equals total USDmZ minted
+            // 1:1 conversion - max supply equals total USDmore minted
             maxSupplyEver = uint112(totalSupply());
             emit MaxSupplyLocked(maxSupplyEver);
         }
     }
 
     /**
-     * @dev Mint USDmZ by depositing USDmY (standard minting with fees)
-     * 1:1 ratio (USDmY 18 decimals, USDmZ 18 decimals)
+     * @dev Mint USDmore by depositing USDmY (standard minting with fees)
+     * 1:1 ratio (USDmY 18 decimals, USDmore 18 decimals)
      * After minting period: Can only mint up to available capacity
      * @param collateralAmount Amount of USDmY to deposit (requires prior approval)
      */
@@ -233,7 +233,7 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
     }
 
     /**
-     * @dev Redeem USDmZ for USDmY
+     * @dev Redeem USDmore for USDmY
      * Returns proportional share of contract's USDmY reserve (minus 1% fee)
      */
     function redeem(uint256 amount) external nonReentrant {
@@ -646,11 +646,11 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
             if (prize.amount > 0) {
                 emit UnclaimedPrizeExpired(prize.winner, prize.amount, lotteryDay, slot, true);
 
-                // Try to redeem USDmZ for USDmY and send to owner
+                // Try to redeem USDmore for USDmY and send to owner
                 address beneficiary = owner();
 
-                // Calculate USDmY value of the USDmZ prizeToSend
-                // USDmY amount = (USDmZ amount * USDmY reserve) / total supply
+                // Calculate USDmY value of the USDmore prizeToSend
+                // USDmY amount = (USDmore amount * USDmY reserve) / total supply
                 uint256 collateralToSend = (uint256(prize.amount) *
                     getReserve()) / totalSupply();
 
@@ -667,7 +667,7 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
                     (data.length == 0 || abi.decode(data, (bool)));
 
                 if (success) {
-                    // USDmY transfer successful, now burn the USDmZ tokens from lottery pool
+                    // USDmY transfer successful, now burn the USDmore tokens from lottery pool
                     _burn(LOT_POOL, prize.amount);
                     emit BeneficiaryFunded(
                         beneficiary,
@@ -683,7 +683,7 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
 
             // Store new prize in the slot (overwriting any previous data)
             prize.winner = winner;
-            prize.amount = uint112(feesToDistribute); // Store USDmZ amount as prize
+            prize.amount = uint112(feesToDistribute); // Store USDmore amount as prize
 
             emit LotteryWon(winner, feesToDistribute, lotteryDay);
         }
@@ -928,7 +928,7 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
             _finalizeAuction();
         }
 
-        // Calculate minimum bid for the USDmZ amount being auctioned
+        // Calculate minimum bid for the USDmore amount being auctioned
         // MinBid = (USDmY reserve * feesToDistribute) / (2 * totalSupply)
         // This sets the minimum bid at 50% of the redemption value
         // Overflow safety: reserve < 2^96, feesToDistribute < 2^112, product < 2^208
@@ -981,8 +981,8 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
             // Try to send to owner
             address beneficiary = owner();
 
-            // Calculate USDmY value of the USDmZ prize
-            // USDmY amount = (USDmZ amount * USDmY reserve) / total supply
+            // Calculate USDmY value of the USDmore prize
+            // USDmY amount = (USDmore amount * USDmY reserve) / total supply
             uint256 collateralToSend = (uint256(prize.amount) *
                 getReserve()) / totalSupply();
 
@@ -1025,7 +1025,7 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
     /**
      * @dev Place a bid in the current auction
      * The bidder must have approved USDmY for at least 10% higher than the current bid
-     * Winning bid gets the auctioned USDmZ tokens
+     * Winning bid gets the auctioned USDmore tokens
      * Previous bidder gets their USDmY refunded immediately
      *
      * We enforce a 10% minimum increment to make auctions more accessible to non-bot participants.

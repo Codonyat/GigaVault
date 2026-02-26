@@ -263,7 +263,7 @@ contract GigaVaultMintingTest is GigaVaultTestBase {
         assertEq(
             vault.maxSupplyEver(),
             2 ether,
-            "Max supply should be 2 USDmZ"
+            "Max supply should be 2 USDmore"
         );
 
         vm.prank(alice);

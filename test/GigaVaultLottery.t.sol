@@ -7,10 +7,10 @@ import {console} from "forge-std/Test.sol";
 contract GigaVaultLotteryTest is GigaVaultTestBase {
     function testPrevrandaoLottery() public {
         mintVault(alice, 10 ether);
-        assertEq(vault.balanceOf(alice), 9.9 ether, "Alice should have 9.9 USDmZ");
+        assertEq(vault.balanceOf(alice), 9.9 ether, "Alice should have 9.9 USDmore");
 
         mintVault(bob, 5 ether);
-        assertEq(vault.balanceOf(bob), 4.95 ether, "Bob should have 4.95 USDmZ");
+        assertEq(vault.balanceOf(bob), 4.95 ether, "Bob should have 4.95 USDmore");
 
         skipPastMintingPeriod();
 

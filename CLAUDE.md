@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-GigaVault is a Solidity smart contract project implementing an ERC20 token (USDmZ) backed by USDmY (from Avon) with daily lottery mechanics and auction-based fee distribution. The token uses a 1:1 ratio (both 18 decimals) and implements a 1% fee structure on all operations.
+GigaVault is a Solidity smart contract project implementing an ERC20 token (USDmore) backed by USDmY (from Avon) with daily lottery mechanics and auction-based fee distribution. The token uses a 1:1 ratio (both 18 decimals) and implements a 1% fee structure on all operations.
 
 ## Development Commands
 
@@ -82,4 +82,4 @@ Tests are located in `test/` directory and use Foundry's testing framework. Key 
 2. **Smart Contract Exclusion**: Smart contracts are excluded from lottery participation (only EOAs can win)
 3. **Fee Minting During Initial Period**: During the 3-day minting period, fees are also minted as new tokens rather than redistributed
 4. **Redemption Creates Capacity**: After minting period ends, burning tokens creates capacity for new mints up to the original max supply
-5. **Unclaimed Prizes**: Owner (via Ownable2Step) receives unclaimed prizes as USDmY after conversion from USDmZ
+5. **Unclaimed Prizes**: Owner (via Ownable2Step) receives unclaimed prizes as USDmY after conversion from USDmore
