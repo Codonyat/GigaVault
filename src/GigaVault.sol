@@ -6,6 +6,7 @@ import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/Reentrancy
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 /**
@@ -22,6 +23,7 @@ import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step
  */
 contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
     using SafeERC20 for IERC20;
+    using SafeCast for uint256;
     uint256 public constant FEE_PERCENT = 100; // 1% = 100 basis points
     uint256 public constant BASIS_POINTS = 10_000;
     uint256 public constant MINTING_PERIOD = 3 days;
@@ -992,8 +994,8 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
         currentAuction = Auction({
             currentBidder: address(0),
             currentBid: 0,
-            minBid: uint96(minBid),
-            auctionTokens: uint112(feesToDistribute),
+            minBid: minBid.toUint96(),
+            auctionTokens: feesToDistribute.toUint112(),
             auctionDay: uint32(currentDay - 1) // Day whose fees we're auctioning
         });
 
@@ -1130,7 +1132,7 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
 
         // Update auction state
         currentAuction.currentBidder = msg.sender;
-        currentAuction.currentBid = uint96(bidAmount);
+        currentAuction.currentBid = bidAmount.toUint96();
 
         emit BidPlaced(msg.sender, bidAmount, currentAuction.auctionDay);
 
