@@ -3,7 +3,13 @@
     "allow": [
       "Bash(forge build:*)",
       "Bash(forge test:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "WebFetch(domain:rareskills.io)",
+      "WebFetch(domain:mega.etherscan.io)",
+      "WebSearch",
+      "Bash(echo:*)",
+      "Bash(ls:*)",
+      "Bash(cast call:*)"
     ]
   }
 }

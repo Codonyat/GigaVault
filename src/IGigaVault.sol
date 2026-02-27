@@ -93,6 +93,7 @@ interface IGigaVault {
     function MIN_FEES_FOR_DISTRIBUTION() external view returns (uint256);
     function LOTTERY_PERCENT() external view returns (uint256);
     function USDMY() external view returns (address);
+    function USDM() external view returns (address);
 
     function deploymentTime() external view returns (uint256);
     function mintingEndTime() external view returns (uint256);
@@ -171,6 +172,15 @@ interface IGigaVault {
     function mint(uint256 collateralAmount) external;
 
     /**
+     * @notice Mint USDmore by depositing USDm (automatically converted to USDmY).
+     * @dev USDm is deposited into the USDmY ERC4626 vault; the resulting shares
+     *      are used as collateral. Same fee and max supply rules as mint().
+     *      Requires prior ERC20 approval of USDm.
+     * @param usdmAmount Amount of USDm to deposit
+     */
+    function mintWithUSDm(uint256 usdmAmount) external;
+
+    /**
      * @notice Redeem USDmore for a proportional share of the USDmY reserve.
      * @dev Redemption value = `(amount - 1% fee) * reserve / totalSupply`.
      *      Because the reserve may grow (from auction bids absorbed) or shrink
@@ -181,6 +191,14 @@ interface IGigaVault {
      * @param amount Amount of USDmore to redeem
      */
     function redeem(uint256 amount) external;
+
+    /**
+     * @notice Redeem USDmore and receive USDm (USDmY is unwrapped automatically).
+     * @dev The proportional USDmY share is redeemed from the USDmY ERC4626 vault,
+     *      and the underlying USDm is sent directly to the caller.
+     * @param amount Amount of USDmore to redeem
+     */
+    function redeemToUSDm(uint256 amount) external;
 
     /**
      * @notice Place a bid in the current daily auction using USDmY.
@@ -197,6 +215,15 @@ interface IGigaVault {
      * @param bidAmount Amount of USDmY to bid
      */
     function bid(uint256 bidAmount) external;
+
+    /**
+     * @notice Place a bid using USDm (automatically converted to USDmY).
+     * @dev USDm is deposited into the USDmY vault; the resulting shares are used
+     *      as the bid amount. Refunds for outbid bidders are always in USDmY.
+     *      Requires prior ERC20 approval of USDm.
+     * @param usdmAmount Amount of USDm to bid
+     */
+    function bidWithUSDm(uint256 usdmAmount) external;
 
     /**
      * @notice Manually trigger the daily lottery and auction cycle.

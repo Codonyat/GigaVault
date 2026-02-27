@@ -5,6 +5,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 /**
@@ -84,6 +85,10 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
     address public constant USDMY =
         0x2eA493384F42d7Ea78564F3EF4C86986eAB4a890;
 
+    // USDm token (ERC20) - the underlying stablecoin that USDmY wraps
+    address public constant USDM =
+        0xFAfDdbb3FC7688494971a79cc65DCa3EF82079E7;
+
     // Track USDmY escrowed for auction bids (separate from reserve)
     // This ensures bid amounts don't inflate the apparent reserve
     uint256 public escrowedBid;
@@ -140,6 +145,7 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
         oneDayEndTime = deploymentTime + 1 days;
         mintingEndTime = deploymentTime + MINTING_PERIOD;
         require(mintingEndTime >= oneDayEndTime);
+        require(IERC4626(USDMY).asset() == USDM, "USDmY asset mismatch");
     }
 
     /**
@@ -170,6 +176,18 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
     }
 
     /**
+     * @dev Convert USDm to USDmY by depositing into the USDmY vault
+     * @param usdmAmount Amount of USDm to deposit
+     * @return sharesReceived Amount of USDmY shares received
+     */
+    function _depositUSDmForUSDmY(uint256 usdmAmount) internal returns (uint256 sharesReceived) {
+        IERC20(USDM).safeTransferFrom(msg.sender, address(this), usdmAmount);
+        IERC20(USDM).forceApprove(USDMY, usdmAmount);
+        sharesReceived = IERC4626(USDMY).deposit(usdmAmount, address(this));
+        require(sharesReceived > 0, "Zero shares received");
+    }
+
+    /**
      * @dev Mint USDmore by depositing USDmY (standard minting with fees)
      * 1:1 ratio (USDmY 18 decimals, USDmore 18 decimals)
      * After minting period: Can only mint up to available capacity
@@ -178,21 +196,42 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
     function mint(uint256 collateralAmount) external nonReentrant {
         require(collateralAmount > 0, "Must send USDmY");
 
-        // Check and set max supply before any potential burns
         _checkAndSetMaxSupply();
-
-        // Try to execute pending lottery/auction before changing state
         _tryExecuteLotteryAndAuction();
 
+        uint256 reserveBefore = getReserve();
+
+        IERC20(USDMY).safeTransferFrom(msg.sender, address(this), collateralAmount);
+
+        _mintCore(collateralAmount, reserveBefore);
+    }
+
+    /**
+     * @dev Mint USDmore by depositing USDm (converted to USDmY automatically)
+     * @param usdmAmount Amount of USDm to deposit (requires prior approval)
+     */
+    function mintWithUSDm(uint256 usdmAmount) external nonReentrant {
+        require(usdmAmount > 0, "Must send USDm");
+
+        _checkAndSetMaxSupply();
+        _tryExecuteLotteryAndAuction();
+
+        uint256 reserveBefore = getReserve();
+
+        uint256 sharesReceived = _depositUSDmForUSDmY(usdmAmount);
+
+        _mintCore(sharesReceived, reserveBefore);
+    }
+
+    /**
+     * @dev Core minting logic shared by mint() and mintWithUSDm()
+     * @param collateralAmount Amount of USDmY collateral already in the contract
+     * @param reserveBefore Reserve captured before collateral transfer
+     */
+    function _mintCore(uint256 collateralAmount, uint256 reserveBefore) internal {
         uint256 tokensToMint;
         uint256 fee;
         uint256 netTokens;
-
-        // Get reserve BEFORE transfer for accurate calculation
-        uint256 reserveBefore = getReserve();
-
-        // Transfer USDmY from user (requires prior approval)
-        IERC20(USDMY).safeTransferFrom(msg.sender, address(this), collateralAmount);
 
         if (block.timestamp <= oneDayEndTime) {
             // During first day 1:1 in base units
@@ -237,22 +276,36 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
      * Returns proportional share of contract's USDmY reserve (minus 1% fee)
      */
     function redeem(uint256 amount) external nonReentrant {
+        uint256 collateralToReturn = _redeemCore(amount);
+        IERC20(USDMY).safeTransfer(msg.sender, collateralToReturn);
+    }
+
+    /**
+     * @dev Redeem USDmore and receive USDm (USDmY is unwrapped automatically)
+     * @param amount Amount of USDmore to redeem
+     */
+    function redeemToUSDm(uint256 amount) external nonReentrant {
+        uint256 collateralToReturn = _redeemCore(amount);
+        IERC4626(USDMY).redeem(collateralToReturn, msg.sender, address(this));
+    }
+
+    /**
+     * @dev Core redemption logic shared by redeem() and redeemToUSDm()
+     * @param amount Amount of USDmore to redeem
+     * @return collateralToReturn Amount of USDmY to return
+     */
+    function _redeemCore(uint256 amount) internal returns (uint256 collateralToReturn) {
         require(amount > 0, "Amount must be greater than 0");
         require(balanceOf(msg.sender) >= amount, "Insufficient balance");
 
-        // Check and set max supply before any potential burns
         _checkAndSetMaxSupply();
-
-        // Try to execute pending lottery/auction before changing state
         _tryExecuteLotteryAndAuction();
 
         uint256 fee = (amount * FEE_PERCENT) / BASIS_POINTS;
         uint256 netTokens = amount - fee;
 
         // Calculate proportional USDmY to return before state changes
-        // Use getReserve() to exclude escrowed bid amounts
-        uint256 collateralToReturn = (netTokens * getReserve()) /
-            totalSupply();
+        collateralToReturn = (netTokens * getReserve()) / totalSupply();
 
         // Transfer fees atomically (Fenwick tree updated automatically)
         if (fee > 0) {
@@ -261,9 +314,6 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
 
         // Burn the remainder from user atomically (Fenwick tree updated automatically)
         _burn(msg.sender, netTokens);
-
-        // Transfer proportional USDmY back to user
-        IERC20(USDMY).safeTransfer(msg.sender, collateralToReturn);
 
         emit Redeemed(msg.sender, amount, collateralToReturn, fee);
     }
@@ -924,7 +974,7 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
         uint256 currentDay = getCurrentDay();
 
         // Finalize previous auction if it exists
-        if (currentAuction.auctionDay != 0) {
+        if (currentAuction.auctionTokens != 0) {
             _finalizeAuction();
         }
 
@@ -1036,9 +1086,27 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
      * @param bidAmount Amount of USDmY to bid (requires prior approval)
      */
     function bid(uint256 bidAmount) external nonReentrant {
-        require(currentAuction.auctionDay != 0, "No active auction");
+        IERC20(USDMY).safeTransferFrom(msg.sender, address(this), bidAmount);
+        _bidCore(bidAmount);
+    }
 
-        // Check and set max supply (for consistency)
+    /**
+     * @dev Place a bid using USDm (converted to USDmY automatically)
+     * Refunds for outbid bidders are always in USDmY.
+     * @param usdmAmount Amount of USDm to bid (requires prior approval)
+     */
+    function bidWithUSDm(uint256 usdmAmount) external nonReentrant {
+        uint256 sharesReceived = _depositUSDmForUSDmY(usdmAmount);
+        _bidCore(sharesReceived);
+    }
+
+    /**
+     * @dev Core bid logic shared by bid() and bidWithUSDm()
+     * @param bidAmount Amount of USDmY already in the contract to bid
+     */
+    function _bidCore(uint256 bidAmount) internal {
+        require(currentAuction.auctionTokens != 0, "No active auction");
+
         _checkAndSetMaxSupply();
 
         uint256 currentDay = getCurrentDay();
@@ -1053,9 +1121,6 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
 
         require(bidAmount >= minBid, "Bid too low");
 
-        // Transfer USDmY from bidder (requires prior approval)
-        IERC20(USDMY).safeTransferFrom(msg.sender, address(this), bidAmount);
-
         // Track as escrowed (not part of reserve until auction finalizes)
         escrowedBid += bidAmount;
 
@@ -1069,9 +1134,8 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
 
         emit BidPlaced(msg.sender, bidAmount, currentAuction.auctionDay);
 
-        // Refund previous bidder if exists
+        // Refund previous bidder if exists (always in USDmY)
         if (previousBidder != address(0)) {
-            // Remove from escrow before transfer
             escrowedBid -= previousBid;
             IERC20(USDMY).safeTransfer(previousBidder, previousBid);
             emit BidRefunded(previousBidder, previousBid);
