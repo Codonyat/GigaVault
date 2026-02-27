@@ -387,7 +387,8 @@ contract GigaVault is ERC20, ReentrancyGuardTransient, Ownable2Step {
         // This ensures Fenwick tree consistency
         // For self-transfers, we still need to emit the Transfer event
         if (from == to) {
-            // Self-transfer: emit event but skip the no-op balance update
+            // Self-transfer: enforce balance check since _atomicUpdate is skipped
+            require(balanceOf(from) >= value, "Insufficient balance");
             emit Transfer(from, to, netAmount);
         } else {
             // Normal transfer: update balances and emit event via _atomicUpdate

@@ -93,13 +93,13 @@ contract GigaVaultTransferTest is GigaVaultTestBase {
         uint256 fenwickBefore = vault.getSuffixSum(1);
 
         vm.prank(alice);
-        vault.transfer(alice, 100 ether);
+        vault.transfer(alice, 9.9 ether);
 
         uint256 aliceBalanceAfter = vault.balanceOf(alice);
         uint256 fenwickAfter = vault.getSuffixSum(1);
 
         // Alice should lose 1% fee even on self-transfer
-        assertEq(aliceBalanceAfter, aliceBalanceBefore - 1 ether, "Should charge fee on self-transfer");
+        assertEq(aliceBalanceAfter, aliceBalanceBefore - 0.099 ether, "Should charge fee on self-transfer");
 
         // Fenwick should still be consistent
         assertEq(fenwickAfter, aliceBalanceAfter, "Fenwick should match Alice's balance");
@@ -114,12 +114,12 @@ contract GigaVaultTransferTest is GigaVaultTestBase {
         assertEq(fenwickBefore, totalBefore, "Initial Fenwick should match total");
 
         vm.prank(alice);
-        vault.transfer(alice, 500 ether);
+        vault.transfer(alice, 9.9 ether);
 
         uint256 totalAfter = vault.balanceOf(alice) + vault.balanceOf(bob);
         uint256 fenwickAfter = vault.getSuffixSum(1);
 
-        assertEq(totalBefore - totalAfter, 5 ether, "Total should decrease by fee");
+        assertEq(totalBefore - totalAfter, 0.099 ether, "Total should decrease by fee");
 
         assertEq(fenwickAfter, totalAfter, "Fenwick should match new total");
     }
